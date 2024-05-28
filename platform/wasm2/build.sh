@@ -2,7 +2,7 @@
 
 ## Without starting from scratch, the relevant XCFLAGS arguments (disabling/enabling embedded fonts) are ignored
 ## A better solution may be possible
-rm -rf ../../build
+rm -rf ../../build/wasm2
 
 source /home/user/Documents/dev/emsdk/emsdk_env.sh
 
@@ -50,9 +50,14 @@ make -j4 -C ../.. \
 	XCFLAGS="-DTOFU -DTOFU_CJK -DFZ_ENABLE_SVG=0 -DFZ_ENABLE_HTML=0 -DFZ_ENABLE_EPUB=0 -DFZ_ENABLE_JS=0 -DFZ_ENABLE_ICC=0 -DFZ_ENABLE_XPS=0 -DFZ_ENABLE_CBZ=0 -DFZ_ENABLE_IMG=0 -DFZ_ENABLE_OCR_OUTPUT=0 -DFZ_ENABLE_DOCX_OUTPUT=0 -DFZ_ENABLE_ODT_OUTPUT=0" \
 	libs
 
+## Note: Compiling with "Os" optimization was found to introduce a significant bug, which was not present for "O3".
+## Therefore, despite the larger file size, "O3" is used for the final build.
+## Specifically, when "0s" was used, flags were being changed in a non-deterministic way, without any code to change them.
+## When extracting stext from the PDF, `dev->flags & FZ_STEXT_DEHYPHENATE` would sometimes be true and sometimes false, even though the code to change this flag was not present.
+## Adding print statement showed that `dev->flags` was switching between 0 and 1082479957.
 echo
 echo Linking WebAssembly:
-emcc -Wall -Os -g1 -o libmupdf.js \
+emcc -Wall -O3 -g1 -o libmupdf.js \
 	-s WASM=1 \
 	-s VERBOSE=0 \
 	-s ASSERTIONS=1 \

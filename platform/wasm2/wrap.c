@@ -368,7 +368,7 @@ char *pageText(fz_document *doc, int pagenum, float dpi, int format, int skip_te
 		} else if (format == 3) {
 			fz_print_stext_page_as_xml(ctx, out, stext_page, pagenum);
 		} else {
-			fz_print_stext_page_as_json(ctx, out, stext_page, pagenum);
+			fz_print_stext_page_as_json(ctx, out, stext_page, 1.0);
 		}
 
 		fz_close_output(ctx, out);
@@ -976,4 +976,125 @@ EMSCRIPTEN_KEEPALIVE
 fz_outline *outlineNext(fz_outline *node)
 {
 	return node->next;
+}
+
+EMSCRIPTEN_KEEPALIVE
+static void savefont(pdf_obj *dict, int fontCount)
+{
+	char namebuf[100];
+	fz_buffer *buf;
+	pdf_obj *stream = NULL;
+	pdf_obj *obj;
+	char *ext = "";
+	fz_output *out;
+	size_t len;
+	unsigned char *data;
+
+	obj = pdf_dict_get(ctx, dict, PDF_NAME(FontFile));
+	if (obj)
+	{
+		stream = obj;
+		ext = "pfa";
+	}
+
+	obj = pdf_dict_get(ctx, dict, PDF_NAME(FontFile2));
+	if (obj)
+	{
+		stream = obj;
+		ext = "ttf";
+	}
+
+	obj = pdf_dict_get(ctx, dict, PDF_NAME(FontFile3));
+	if (obj)
+	{
+		stream = obj;
+
+		obj = pdf_dict_get(ctx, obj, PDF_NAME(Subtype));
+		if (obj && !pdf_is_name(ctx, obj))
+			fz_throw(ctx, FZ_ERROR_GENERIC, "invalid font descriptor subtype");
+
+		if (pdf_name_eq(ctx, obj, PDF_NAME(Type1C)))
+			ext = "cff";
+		else if (pdf_name_eq(ctx, obj, PDF_NAME(CIDFontType0C)))
+			ext = "cid";
+		else if (pdf_name_eq(ctx, obj, PDF_NAME(OpenType)))
+			ext = "otf";
+		else
+			fz_throw(ctx, FZ_ERROR_GENERIC, "unhandled font type '%s'", pdf_to_name(ctx, obj));
+	}
+
+	if (!stream)
+	{
+		fz_warn(ctx, "unhandled font type");
+		return;
+	}
+
+	buf = pdf_load_stream(ctx, stream);
+	len = fz_buffer_storage(ctx, buf, &data);
+	fz_try(ctx)
+	{
+		// TODO: Figure out how to support different formats, or limit to only exporting certain formats.
+		// fz_snprintf(namebuf, sizeof(namebuf), "font-%04d.%s", pdf_to_num(ctx, dict), ext);
+		fz_snprintf(namebuf, sizeof(namebuf), "font-%04d.%s", fontCount, ext);
+		printf("extracting %s\n", namebuf);
+		out = fz_new_output_with_path(ctx, namebuf, 0);
+		fz_try(ctx)
+		{
+			fz_write_data(ctx, out, data, len);
+			fz_close_output(ctx, out);
+		}
+		fz_always(ctx)
+			fz_drop_output(ctx, out);
+		fz_catch(ctx)
+			fz_rethrow(ctx);
+	}
+	fz_always(ctx)
+		fz_drop_buffer(ctx, buf);
+	fz_catch(ctx)
+		fz_rethrow(ctx);
+}
+
+static int supportedfont(pdf_obj *obj)
+{
+	// pdf_obj *obj;
+	// obj = pdf_dict_get(ctx, dict, PDF_NAME(FontFile2));
+
+	// For now, only use .ttf files.
+	pdf_obj *obj2 = pdf_dict_get(ctx, obj, PDF_NAME(FontFile2));
+
+	return obj2 ? 1 : 0;
+
+	// pdf_obj *type = pdf_dict_get(ctx, obj, PDF_NAME(Type));
+	// return pdf_name_eq(ctx, type, PDF_NAME(FontDescriptor));
+}
+
+EMSCRIPTEN_KEEPALIVE
+int extractAllFonts(fz_document *doc)
+{
+	int fontCount = 0;
+	int o;
+	pdf_obj *ref;
+	fz_var(doc);
+
+	fz_try(ctx)
+	{
+		int len = pdf_count_objects(ctx, doc);
+		for (o = 1; o < len; o++)
+		{
+			ref = pdf_new_indirect(ctx, doc, o, 0);
+			if (supportedfont(ref)) {
+				fontCount++;
+				savefont(ref, fontCount);
+			}
+		}
+
+	}
+	fz_always(ctx)
+		pdf_drop_obj(ctx, ref);
+	fz_catch(ctx)
+	{
+		fz_log_error(ctx, fz_caught_message(ctx));
+	}
+
+	return fontCount;
 }
