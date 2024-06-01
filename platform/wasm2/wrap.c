@@ -142,7 +142,6 @@ int count_stext_page_letters(fz_context *ctx, fz_stext_page *page)
 	fz_stext_block *block;
 	fz_stext_line *line;
 	fz_stext_char *ch;
-	char utf[10];
 	int i, n;
 	int ct = 0;
 	int nnmlCt = 0;
@@ -280,6 +279,7 @@ int checkNativeText(fz_document *doc, int extract_text)
 		}
 		fz_catch(ctx)
 		{
+			fz_report_error(ctx);
 			fz_rethrow(ctx);
 		}
 
@@ -387,6 +387,7 @@ char *pageText(fz_document *doc, int pagenum, float dpi, int format, int skip_te
 	}
 	fz_catch(ctx)
 	{
+		fz_report_error(ctx);
 		fz_rethrow(ctx);
 	}
 
@@ -458,7 +459,6 @@ static void runpageOverlayPDF(int number, fz_document *doc, fz_document *doc2, f
 	// 72 / 300 = 0.24
 	// TODO: Make this a variable and compatible with other DPIs (it is not ALWAYS 300).
 	fz_matrix text_matrix;
-	fz_matrix immat;
 
 	page = fz_load_page(ctx, doc, number);
 	page2 = fz_load_page(ctx, doc2, number);
@@ -499,8 +499,10 @@ static void runpageOverlayPDF(int number, fz_document *doc, fz_document *doc2, f
 		fz_drop_page(ctx, page);
 		fz_drop_page(ctx, page2);
 	}
-	fz_catch(ctx)
+	fz_catch(ctx) {
+		fz_report_error(ctx);
 		fz_rethrow(ctx);
+	}
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -510,11 +512,6 @@ static void runpage(int number, fz_document *doc, fz_document_writer *out, int p
 
 	fz_page *page;
 	fz_device *dev = NULL;
-
-	// The coordinate system from the Javascript assumes a DPI of 300 by default.
-	// 72 / 300 = 0.24
-	// TODO: Make this a variable and compatible with other DPIs (it is not ALWAYS 300).
-	fz_matrix immat;
 
 	page = fz_load_page(ctx, doc, number);
 
@@ -542,8 +539,10 @@ static void runpage(int number, fz_document *doc, fz_document_writer *out, int p
 	{
 		fz_drop_page(ctx, page);
 	}
-	fz_catch(ctx)
+	fz_catch(ctx) {
+		fz_report_error(ctx);
 		fz_rethrow(ctx);
+	}
 }
 
 
@@ -553,10 +552,7 @@ void overlayPDFText(fz_document *doc, fz_document *doc2, int minpage, int maxpag
 {
 	fz_document_writer *out;
 
-	fz_rect mediabox;
-
 	fz_page *page;
-	fz_page *page2;
 
 	char *output = "/download.pdf";
 
@@ -565,11 +561,6 @@ void overlayPDFText(fz_document *doc, fz_document *doc2, int minpage, int maxpag
 	char *options = humanReadable == 1 ? optionsHumanReadable : optionsDefault;
 
 	out = fz_new_pdf_writer(ctx, output, options);
-
-	// The coordinate system from the Javascript assumes a DPI of 300 by default.
-	// 72 / 300 = 0.24
-	// TODO: Make this a variable and compatible with other DPIs (it is not ALWAYS 300).
-	fz_matrix text_matrix = fz_make_matrix(0.24, 0, 0, 0.24, 0, 0);
 
 	int count = fz_count_pages(ctx, doc);
 
@@ -654,8 +645,10 @@ static void runpageOverlayImage(int number, fz_document *doc, fz_document_writer
 		fz_drop_image(ctx, background_img);
 		fz_drop_page(ctx, page);
 	}
-	fz_catch(ctx)
+	fz_catch(ctx) {
+		fz_report_error(ctx);
 		fz_rethrow(ctx);
+	}
 }
 
 // Unlike for combining multiple PDF documents (overlayPDFText), when creating a PDF from images,
@@ -693,7 +686,6 @@ void overlayPDFTextImage(fz_document *doc, int minpage, int maxpage, int pagewid
 	fz_document_writer *out;
 
 	fz_page *page;
-	fz_device *dev = NULL;
 
 	char *output = "/download.pdf";
 	char *optionsDefault = "compress";
@@ -723,9 +715,6 @@ EMSCRIPTEN_KEEPALIVE
 void writePDF(fz_document *doc, int minpage, int maxpage, int pagewidth, int pageheight, int humanReadable)
 {
 	fz_document_writer *out;
-
-	fz_page *page;
-	fz_device *dev = NULL;
 
 	char *output = "/download.pdf";
 	char *optionsDefault = "compress";
@@ -1050,8 +1039,11 @@ static void savefont(pdf_obj *dict, int fontCount)
 	}
 	fz_always(ctx)
 		fz_drop_buffer(ctx, buf);
-	fz_catch(ctx)
+	fz_catch(ctx) {
+		fz_report_error(ctx);
 		fz_rethrow(ctx);
+	}
+		
 }
 
 static int supportedfont(pdf_obj *obj)

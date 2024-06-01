@@ -447,7 +447,12 @@ pdf_dev_font(fz_context *ctx, pdf_device *pdev, fz_font *font, fz_matrix trm)
 	if (fz_font_t3_procs(ctx, font))
 		fz_throw(ctx, FZ_ERROR_UNSUPPORTED, "pdf device does not support type 3 fonts");
 
-	if (fz_font_flags(font)->ft_substitute || !pdf_font_writing_supported(ctx, font))
+	// If the font is non-CJK, this condition simply leads to an error being thrown:
+	// "substitute font creation is not implemented yet"
+	// If this block is skipped, the output still seems to work correctly.
+	// Therefore, this is only implemented for CJK fonts, until this is fixed.
+	// if (fz_font_flags(font)->ft_substitute || !pdf_font_writing_supported(ctx, font))
+	if (fz_font_flags(font)->ft_substitute && font->flags.cjk)
 		gs->font = pdf_dev_add_substitute_font_res(ctx, pdev, font);
 	else
 		gs->font = pdf_dev_add_embedded_font_res(ctx, pdev, font);
