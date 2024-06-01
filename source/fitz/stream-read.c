@@ -107,7 +107,7 @@ fz_read_best(fz_context *ctx, fz_stream *stm, size_t initial, int *truncated, si
 				fz_grow_buffer(ctx, buf);
 
 			if (check_bomb && buf->len > worst_case)
-				fz_throw(ctx, FZ_ERROR_GENERIC, "compression bomb detected");
+				fz_throw(ctx, FZ_ERROR_FORMAT, "compression bomb detected");
 
 			n = fz_read(ctx, stm, buf->data + buf->len, buf->cap - buf->len);
 			if (n == 0)
@@ -118,7 +118,7 @@ fz_read_best(fz_context *ctx, fz_stream *stm, size_t initial, int *truncated, si
 	}
 	fz_catch(ctx)
 	{
-		if (fz_caught(ctx) == FZ_ERROR_TRYLATER)
+		if (fz_caught(ctx) == FZ_ERROR_TRYLATER || fz_caught(ctx) == FZ_ERROR_SYSTEM)
 		{
 			fz_drop_buffer(ctx, buf);
 			fz_rethrow(ctx);
@@ -126,6 +126,7 @@ fz_read_best(fz_context *ctx, fz_stream *stm, size_t initial, int *truncated, si
 		if (truncated)
 		{
 			*truncated = 1;
+			fz_report_error(ctx);
 		}
 		else
 		{
@@ -260,7 +261,7 @@ uint16_t fz_read_uint16(fz_context *ctx, fz_stream *stm)
 	int a = fz_read_byte(ctx, stm);
 	int b = fz_read_byte(ctx, stm);
 	if (a == EOF || b == EOF)
-		fz_throw(ctx, FZ_ERROR_GENERIC, "premature end of file in int16");
+		fz_throw(ctx, FZ_ERROR_FORMAT, "premature end of file in int16");
 	return ((uint16_t)a<<8) | ((uint16_t)b);
 }
 
@@ -270,7 +271,7 @@ uint32_t fz_read_uint24(fz_context *ctx, fz_stream *stm)
 	int b = fz_read_byte(ctx, stm);
 	int c = fz_read_byte(ctx, stm);
 	if (a == EOF || b == EOF || c == EOF)
-		fz_throw(ctx, FZ_ERROR_GENERIC, "premature end of file in int24");
+		fz_throw(ctx, FZ_ERROR_FORMAT, "premature end of file in int24");
 	return ((uint32_t)a<<16) | ((uint32_t)b<<8) | ((uint32_t)c);
 }
 
@@ -281,7 +282,7 @@ uint32_t fz_read_uint32(fz_context *ctx, fz_stream *stm)
 	int c = fz_read_byte(ctx, stm);
 	int d = fz_read_byte(ctx, stm);
 	if (a == EOF || b == EOF || c == EOF || d == EOF)
-		fz_throw(ctx, FZ_ERROR_GENERIC, "premature end of file in int32");
+		fz_throw(ctx, FZ_ERROR_FORMAT, "premature end of file in int32");
 	return ((uint32_t)a<<24) | ((uint32_t)b<<16) | ((uint32_t)c<<8) | ((uint32_t)d);
 }
 
@@ -296,7 +297,7 @@ uint64_t fz_read_uint64(fz_context *ctx, fz_stream *stm)
 	int g = fz_read_byte(ctx, stm);
 	int h = fz_read_byte(ctx, stm);
 	if (a == EOF || b == EOF || c == EOF || d == EOF || e == EOF || f == EOF || g == EOF || h == EOF)
-		fz_throw(ctx, FZ_ERROR_GENERIC, "premature end of file in int64");
+		fz_throw(ctx, FZ_ERROR_FORMAT, "premature end of file in int64");
 	return ((uint64_t)a<<56) | ((uint64_t)b<<48) | ((uint64_t)c<<40) | ((uint64_t)d<<32)
 		| ((uint64_t)e<<24) | ((uint64_t)f<<16) | ((uint64_t)g<<8) | ((uint64_t)h);
 }
@@ -306,7 +307,7 @@ uint16_t fz_read_uint16_le(fz_context *ctx, fz_stream *stm)
 	int a = fz_read_byte(ctx, stm);
 	int b = fz_read_byte(ctx, stm);
 	if (a == EOF || b == EOF)
-		fz_throw(ctx, FZ_ERROR_GENERIC, "premature end of file in int16");
+		fz_throw(ctx, FZ_ERROR_FORMAT, "premature end of file in int16");
 	return ((uint16_t)a) | ((uint16_t)b<<8);
 }
 
@@ -316,7 +317,7 @@ uint32_t fz_read_uint24_le(fz_context *ctx, fz_stream *stm)
 	int b = fz_read_byte(ctx, stm);
 	int c = fz_read_byte(ctx, stm);
 	if (a == EOF || b == EOF || c == EOF)
-		fz_throw(ctx, FZ_ERROR_GENERIC, "premature end of file in int24");
+		fz_throw(ctx, FZ_ERROR_FORMAT, "premature end of file in int24");
 	return ((uint32_t)a) | ((uint32_t)b<<8) | ((uint32_t)c<<16);
 }
 
@@ -327,7 +328,7 @@ uint32_t fz_read_uint32_le(fz_context *ctx, fz_stream *stm)
 	int c = fz_read_byte(ctx, stm);
 	int d = fz_read_byte(ctx, stm);
 	if (a == EOF || b == EOF || c == EOF || d == EOF)
-		fz_throw(ctx, FZ_ERROR_GENERIC, "premature end of file in int32");
+		fz_throw(ctx, FZ_ERROR_FORMAT, "premature end of file in int32");
 	return ((uint32_t)a) | ((uint32_t)b<<8) | ((uint32_t)c<<16) | ((uint32_t)d<<24);
 }
 
@@ -342,7 +343,7 @@ uint64_t fz_read_uint64_le(fz_context *ctx, fz_stream *stm)
 	int g = fz_read_byte(ctx, stm);
 	int h = fz_read_byte(ctx, stm);
 	if (a == EOF || b == EOF || c == EOF || d == EOF || e == EOF || f == EOF || g == EOF || h == EOF)
-		fz_throw(ctx, FZ_ERROR_GENERIC, "premature end of file in int64");
+		fz_throw(ctx, FZ_ERROR_FORMAT, "premature end of file in int64");
 	return ((uint64_t)a) | ((uint64_t)b<<8) | ((uint64_t)c<<16) | ((uint64_t)d<<24)
 		| ((uint64_t)e<<32) | ((uint64_t)f<<40) | ((uint64_t)g<<48) | ((uint64_t)h<<56);
 }
@@ -379,13 +380,212 @@ void fz_read_string(fz_context *ctx, fz_stream *stm, char *buffer, int len)
 	do
 	{
 		if (len <= 0)
-			fz_throw(ctx, FZ_ERROR_GENERIC, "Buffer overrun reading null terminated string");
+			fz_throw(ctx, FZ_ERROR_FORMAT, "Buffer overrun reading null terminated string");
 
 		c = fz_read_byte(ctx, stm);
 		if (c == EOF)
-			fz_throw(ctx, FZ_ERROR_GENERIC, "EOF reading null terminated string");
+			fz_throw(ctx, FZ_ERROR_FORMAT, "EOF reading null terminated string");
 		*buffer++ = c;
 		len--;
 	}
 	while (c != 0);
+}
+
+int fz_read_rune(fz_context *ctx, fz_stream *in)
+{
+	uint8_t d, e, f;
+	int x;
+	int c = fz_read_byte(ctx, in);
+	if (c == EOF)
+		return EOF;
+
+	if ((c & 0xF8) == 0xF0)
+	{
+		x = fz_read_byte(ctx, in);
+		if (x == EOF)
+			return 0xFFFD;
+		d = (uint8_t)x;
+		c = (c & 7)<<18;
+		if ((d & 0xC0) == 0x80)
+		{
+			x = fz_read_byte(ctx, in);
+			if (x == EOF)
+				return 0xFFFD;
+			e = (uint8_t)x;
+			c += (d & 0x3f)<<12;
+			if ((e & 0xC0) == 0x80)
+			{
+				x = fz_read_byte(ctx, in);
+				if (x == EOF)
+					return 0xFFFD;
+				f = (uint8_t)x;
+				c += (e & 0x3f)<<6;
+				if ((f & 0xC0) == 0x80)
+				{
+					c += f & 0x3f;
+				}
+				else
+					goto bad_byte;
+			}
+			else
+				goto bad_byte;
+		}
+		else
+			goto bad_byte;
+	}
+	else if ((c & 0xF0) == 0xE0)
+	{
+		x = fz_read_byte(ctx, in);
+		if (x == EOF)
+			return 0xFFFD;
+		d = (uint8_t)x;
+		c = (c & 15)<<12;
+		if ((d & 0xC0) == 0x80)
+		{
+			x = fz_read_byte(ctx, in);
+			if (x == EOF)
+				return 0xFFFD;
+			e = (uint8_t)x;
+			c += (d & 0x3f)<<6;
+			if ((e & 0xC0) == 0x80)
+			{
+				c += e & 0x3f;
+			}
+			else
+				goto bad_byte;
+		}
+		else
+			goto bad_byte;
+	}
+	else if ((c & 0xE0) == 0xC0)
+	{
+		x = fz_read_byte(ctx, in);
+		if (x == EOF)
+			return 0xFFFD;
+		d = (uint8_t)x;
+		c = (c & 31)<<6;
+		if ((d & 0xC0) == 0x80)
+		{
+			c += d & 0x3f;
+		}
+		else
+			fz_unread_byte(ctx, in);
+	}
+	else if ((c & 0xc0) == 0x80)
+	{
+bad_byte:
+		fz_unread_byte(ctx, in);
+		return 0xFFFD;
+	}
+
+	return c;
+
+}
+
+int fz_read_utf16_le(fz_context *ctx, fz_stream *stm)
+{
+	int c = fz_read_byte(ctx, stm);
+	int d, e;
+
+	if (c == EOF)
+		return EOF;
+
+	d = fz_read_byte(ctx, stm);
+	if (d == EOF)
+		return c; /* Might be wrong, but the best we can do. */
+
+	c |= d<<8;
+
+	/* If it's not a surrogate, we're done. */
+	if (c < 0xd800 || c >= 0xe000)
+		return c;
+
+	/* It *ought* to be a leading (high) surrogate. If it's not,
+	 * then we're in trouble. */
+	if (c >= 0xdc00)
+		return 0x10000 + c - 0xdc00; /* Imagine the high surrogate was 0. */
+
+	/* Our stream abstraction only enables us to peek 1 byte ahead, and we'd need
+	 * 2 to tell if it was a low surrogate. Just assume it is. */
+	d = fz_read_byte(ctx, stm);
+	if (d == EOF)
+	{
+		/* Failure! Imagine the trailing surrogate was 0. */
+		return 0x10000 + ((c - 0xd800)<<10);
+	}
+	e = fz_read_byte(ctx, stm);
+	if (e == EOF)
+	{
+		e = 0xDC; /* Fudge a low surrogate */
+	}
+
+	d |= e<<8;
+
+	if (d < 0xdc00 || d >= 0xe000)
+	{
+		/* Bad encoding! This is nasty, because we've eaten 2 bytes from the
+		 * stream which ideally we would not have. Serves you right for
+		 * having a broken stream. */
+		return 0x10000 + ((c - 0xd800)<<10); /* Imagine the high surrogate was 0. */
+	}
+
+	c -= 0xd800;
+	d -= 0xdc00;
+
+	return 0x10000 + (c<<10) + d;
+}
+
+int fz_read_utf16_be(fz_context *ctx, fz_stream *stm)
+{
+	int c = fz_read_byte(ctx, stm);
+	int d, e;
+
+	if (c == EOF)
+		return EOF;
+
+	d = fz_read_byte(ctx, stm);
+	if (d == EOF)
+		return c; /* Might be wrong, but the best we can do. */
+
+	c = (c<<8) | d;
+
+	/* If it's not a surrogate, we're done. */
+	if (c < 0xd800 || c >= 0xe000)
+		return c;
+
+	/* It *ought* to be a leading (high) surrogate. If it's not,
+	 * then we're in trouble. */
+	if (c >= 0xdc00)
+		return 0x10000 + c - 0xdc00; /* Imagine the high surrogate was 0. */
+
+	/* Our stream abstraction only enables us to peek 1 byte ahead, and we'd need
+	 * 2 to tell if it was a low surrogate. Just assume it is. */
+	d = fz_read_byte(ctx, stm);
+	if (d == EOF)
+	{
+		/* Failure! Imagine the trailing surrogate was 0. */
+		return 0x10000 + ((c - 0xd800)<<10);
+	}
+
+	/* The next byte ought to be the start of a trailing (low) surrogate. */
+	if (d < 0xdc || d >= 0xe0)
+	{
+		/* It wasn't. Put the byte back. */
+		fz_unread_byte(ctx, stm);
+		d = 0xdc00; /* Pretend it was a 0 surrogate. */
+	}
+	else
+	{
+		e = fz_read_byte(ctx, stm);
+		if (e == EOF)
+		{
+			e = 0;
+		}
+		d = (d<<8) | e;
+	}
+
+	c -= 0xd800;
+	d -= 0xdc00;
+
+	return 0x10000 + (c<<10) + d;
 }

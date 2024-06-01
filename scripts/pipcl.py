@@ -349,8 +349,8 @@ class Package:
                 assumed to be relative to `root`.
 
                 `to_` identifies what the file should be called within a wheel
-                or when installing. If `to_` ends with `/`, the leaf of `from_`
-                is appended to it.
+                or when installing. If `to_` is '' or ends with `/`, the leaf
+                of `from_` is appended to it.
 
                 Initial `$dist-info/` in `_to` is replaced by
                 `{name}-{version}.dist-info/`; this is useful for license files
@@ -512,6 +512,8 @@ class Package:
         self.wheel_compression = wheel_compression
         self.wheel_compresslevel = wheel_compresslevel
 
+        self.wheel_compression = wheel_compression
+        self.wheel_compresslevel = wheel_compresslevel
 
     def build_wheel(self,
             wheel_directory,
@@ -559,6 +561,7 @@ class Package:
             # PEP-425. On Linux gives `linux_x86_64` which is rejected by
             # pypi.org.
             #
+            import setuptools
             tag_platform = setuptools.distutils.util.get_platform().replace('-', '_').replace('.', '_')
 
             # We need to patch things on MacOS.
@@ -804,7 +807,6 @@ class Package:
             f.write(record.get())
 
         log2(f'Finished.')
-
 
     def _argv_dist_info(self, root):
         '''
@@ -1463,7 +1465,7 @@ def build_extension(
             #   emcc: warning: ignoring unsupported linker flag: `-rpath` [-Wlinkflags]
             #   wasm-ld: error: unknown -z value: origin
             #
-            log0(f'## pyodide(): PEP-3149 suffix untested, so omitting. {_so_suffix()=}.')
+            log0(f'pyodide: PEP-3149 suffix untested, so omitting. {_so_suffix()=}.')
             path_so_leaf = f'_{name}.so'
             path_so = f'{outdir}/{path_so_leaf}'
 
@@ -1529,7 +1531,7 @@ def build_extension(
                         {libs_text}
                         {rpath_flag}
                     '''
-        run_if(
+        command_was_run = run_if(
                 command,
                 path_so,
                 path_cpp,
@@ -1538,10 +1540,10 @@ def build_extension(
                 prerequisites,
                 )
 
-        if darwin():
+        if command_was_run and darwin():
             # We need to patch up references to shared libraries in `libs`.
             sublibraries = list()
-            for lib in libs:
+            for lib in () if libs is None else libs:
                 for libpath in libpaths:
                     found = list()
                     for suffix in '.so', '.dylib':
@@ -1581,7 +1583,9 @@ def base_compiler(vs=None, pythonflags=None, cpp=False, use_env=True):
             If true we return C++ compiler command instead of C. On Windows
             this has no effect - we always return `cl.exe`.
         use_env:
-            If true we use `os.environ['CC']` or `os.environ['CXX']` if set.
+            If true we return '$CC' or '$CXX' if the corresponding
+            environmental variable is set (without evaluating with `getenv()`
+            or `os.environ`).
 
     Returns `(cc, pythonflags)`:
         cc:
@@ -1592,7 +1596,14 @@ def base_compiler(vs=None, pythonflags=None, cpp=False, use_env=True):
     '''
     if not pythonflags:
         pythonflags = PythonFlags()
-    cc = os.environ.get( 'CXX' if cpp else 'CC') if use_env else None
+    cc = None
+    if use_env:
+        if cpp:
+            if os.environ.get( 'CXX'):
+                cc = '$CXX'
+        else:
+            if os.environ.get( 'CC'):
+                cc = '$CC'
     if cc:
         pass
     elif windows():
@@ -1633,7 +1644,10 @@ def base_linker(vs=None, pythonflags=None, cpp=False, use_env=True):
     '''
     if not pythonflags:
         pythonflags = PythonFlags()
-    linker = os.environ.get( 'LD') if use_env else None
+    linker = None
+    if use_env:
+        if os.environ.get( 'LD'):
+            linker = '$LD'
     if linker:
         pass
     elif windows():
@@ -1703,25 +1717,35 @@ def run( command, capture=False, check=1):
             When running the command, on Windows newlines are replaced by
             spaces; otherwise each line is terminated by a backslash character.
         capture:
-            If true, we return output from command.
+            If true, we include the command's output in our return value.
+        check:
+            If true we raise an exception on error; otherwise we include the
+            command's returncode in our return value.
     Returns:
-        None on success, otherwise raises an exception.
+        check capture   Return
+        --------------------------
+          false false   returncode
+          false  true   (returncode, output)
+          true  false   None or raise exception
+          true   true   output or raise exception
     '''
     lines = _command_lines( command)
     nl = '\n'
     log2( f'Running: {nl.join(lines)}')
     sep = ' ' if windows() else '\\\n'
     command2 = sep.join( lines)
-    if capture:
-        return subprocess.run(
-                command2,
-                shell=True,
-                capture_output=True,
-                check=check,
-                encoding='utf8',
-                ).stdout
+    cp = subprocess.run(
+            command2,
+            shell=True,
+            stdout=subprocess.PIPE if capture else None,
+            stderr=subprocess.STDOUT if capture else None,
+            check=check,
+            encoding='utf8',
+            )
+    if check:
+        return cp.stdout if capture else None
     else:
-        subprocess.run( command2, shell=True, check=check)
+        return (cp.returncode, cp.stdout) if capture else cp.returncode
 
 
 def darwin():
@@ -1738,6 +1762,9 @@ def pyodide():
 
 def linux():
     return platform.system() == 'Linux'
+
+def openbsd():
+    return platform.system() == 'OpenBSD'
 
 class PythonFlags:
     '''
@@ -1762,9 +1789,6 @@ class PythonFlags:
             _lib_dir = os.environ[ 'PYO3_CROSS_LIB_DIR']
             self.includes = f'-I {_include_dir}'
             self.ldflags = f'-L {_lib_dir}'
-            log2(f'PythonFlags: Pyodide.')
-            log2( f'    {_include_dir=}')
-            log2( f'    {_lib_dir=}')
 
         else:
             # We use python-config which appears to work better than pkg-config
@@ -1805,9 +1829,10 @@ class PythonFlags:
             else:
                 python_config = f'{python_exe}-config'
             log1(f'Using {python_config=}.')
-            self.includes = run( f'{python_config} --includes', capture=1).strip()
-            #if darwin():
-            #    self.ldflags =
+            try:
+                self.includes = run( f'{python_config} --includes', capture=1).strip()
+            except Exception as e:
+                raise Exception('We require python development tools to be installed.') from e
             self.ldflags = run( f'{python_config} --ldflags', capture=1).strip()
             if linux():
                 # It seems that with python-3.10 on Linux, we can get an
@@ -1855,6 +1880,8 @@ def macos_patch( library, *sublibraries):
     '''
     log2( f'macos_patch(): library={library}  sublibraries={sublibraries}')
     if not darwin():
+        return
+    if not sublibraries:
         return
     subprocess.run( f'otool -L {library}', shell=1, check=1)
     command = 'install_name_tool'
@@ -2151,6 +2178,36 @@ def _so_suffix():
     # things like `numpy/core/_simd.cpython-311-darwin.so`.
     #
     return sysconfig.get_config_var('EXT_SUFFIX')
+
+
+def get_soname(path):
+    '''
+    If we are on Linux and `path` is softlink and points to a shared library
+    for which `objdump -p` contains 'SONAME', return the pointee. Otherwise
+    return `path`. Useful if Linux shared libraries have been created with
+    `-Wl,-soname,...`, where we need to embed the versioned library.
+    '''
+    log1(f'{path=} {os.path.abspath(path)=}.')
+    if linux() and os.path.islink(path):
+        path2 = os.path.realpath(path)
+        log1(f'Is link: {path} -> {path2}.')
+        if subprocess.run(f'objdump -p {path2}|grep SONAME', shell=1, check=0).returncode == 0:
+            log1(f'SONAME, returning {path2=}.')
+            return path2
+        log1(f'Not SONAME')
+    elif openbsd():
+        # Return newest .so with version suffix.
+        sos = glob.glob(f'{path}.*')
+        log1(f'{sos=}')
+        sos2 = list()
+        for so in sos:
+            suffix = so[len(path):]
+            if not suffix or re.match('^[.][0-9.]*[0-9]$', suffix):
+                sos2.append(so)
+        sos2.sort(key=lambda p: os.path.getmtime(p))
+        log1(f'{sos2=}')
+        return sos2[-1]
+    return path
 
 
 def install_dir(root=None):

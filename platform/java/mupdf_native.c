@@ -87,6 +87,7 @@ static JavaVM *jvm = NULL;
 
 /* All the cached classes/mids/fids we need. */
 
+static jclass cls_AbortException;
 static jclass cls_AlertResult;
 static jclass cls_Archive;
 static jclass cls_ArrayOfQuad;
@@ -645,6 +646,14 @@ static int check_enums()
 	valid &= com_artifex_mupdf_fitz_PDFPage_REDACT_IMAGE_NONE == PDF_REDACT_IMAGE_NONE;
 	valid &= com_artifex_mupdf_fitz_PDFPage_REDACT_IMAGE_REMOVE == PDF_REDACT_IMAGE_REMOVE;
 	valid &= com_artifex_mupdf_fitz_PDFPage_REDACT_IMAGE_PIXELS == PDF_REDACT_IMAGE_PIXELS;
+	valid &= com_artifex_mupdf_fitz_PDFPage_REDACT_IMAGE_REMOVE_UNLESS_INVISIBLE == PDF_REDACT_IMAGE_REMOVE_UNLESS_INVISIBLE;
+
+	valid &= com_artifex_mupdf_fitz_PDFPage_REDACT_LINE_ART_NONE == PDF_REDACT_LINE_ART_NONE;
+	valid &= com_artifex_mupdf_fitz_PDFPage_REDACT_LINE_ART_REMOVE_IF_TOUCHED == PDF_REDACT_LINE_ART_REMOVE_IF_TOUCHED;
+	valid &= com_artifex_mupdf_fitz_PDFPage_REDACT_LINE_ART_REMOVE_IF_COVERED == PDF_REDACT_LINE_ART_REMOVE_IF_COVERED;
+
+	valid &= com_artifex_mupdf_fitz_PDFPage_REDACT_TEXT_REMOVE == PDF_REDACT_TEXT_REMOVE;
+	valid &= com_artifex_mupdf_fitz_PDFPage_REDACT_TEXT_NONE == PDF_REDACT_TEXT_NONE;
 
 	return valid ? 1 : 0;
 }
@@ -661,10 +670,14 @@ static void jni_throw_imp(JNIEnv *env, jclass cls, const char *mess)
 
 static void jni_rethrow_imp(JNIEnv *env, fz_context *ctx)
 {
-	if (fz_caught(ctx) == FZ_ERROR_TRYLATER)
-		jni_throw_imp(env, cls_TryLaterException, fz_caught_message(ctx));
+	int code;
+	const char *message = fz_convert_error(ctx, &code);
+	if (code == FZ_ERROR_TRYLATER)
+		jni_throw_imp(env, cls_TryLaterException, message);
+	else if (code == FZ_ERROR_ABORT)
+		jni_throw_imp(env, cls_AbortException, message);
 	else
-		jni_throw_imp(env, cls_RuntimeException, fz_caught_message(ctx));
+		jni_throw_imp(env, cls_RuntimeException, message);
 }
 
 #define jni_rethrow_void(env, ctx) do { jni_rethrow_imp(env, ctx); return; } while (0);
@@ -1249,6 +1262,7 @@ static int find_fids(JNIEnv *env)
 	mid_TreeArchive_init = get_method(&err, env, "<init>", "(J)V");
 	fid_TreeArchive_pointer = get_field(&err, env, "pointer", "J");
 
+	cls_AbortException = get_class(&err, env, PKG"AbortException");
 	cls_TryLaterException = get_class(&err, env, PKG"TryLaterException");
 
 	/* Standard Java classes */
@@ -1306,6 +1320,7 @@ static void jni_detach_thread(jboolean detach)
 
 static void lose_fids(JNIEnv *env)
 {
+	(*env)->DeleteGlobalRef(env, cls_AbortException);
 	(*env)->DeleteGlobalRef(env, cls_AlertResult);
 	(*env)->DeleteGlobalRef(env, cls_Archive);
 	(*env)->DeleteGlobalRef(env, cls_ArrayOfQuad);

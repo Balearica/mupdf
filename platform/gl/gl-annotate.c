@@ -219,6 +219,7 @@ static int run_slow_operation_step(int cancel)
 		ui_show_warning_dialog("%s failed: %s",
 			ui_slow_operation_state.operation_text,
 			fz_caught_message(ctx));
+		fz_report_error(ctx);
 
 		/* Call to cancel. */
 		fz_try(ctx)
@@ -426,6 +427,7 @@ static void do_save_pdf_dialog(int for_signing)
 			fz_catch(ctx)
 			{
 				ui_show_warning_dialog("%s", fz_caught_message(ctx));
+				fz_report_error(ctx);
 			}
 		}
 	}
@@ -482,6 +484,7 @@ static void save_attachment_dialog(void)
 			fz_catch(ctx)
 			{
 				ui_show_warning_dialog("%s", fz_caught_message(ctx));
+				fz_report_error(ctx);
 			}
 		}
 	}
@@ -522,6 +525,7 @@ static void open_attachment_dialog(void)
 			fz_catch(ctx)
 			{
 				ui_show_warning_dialog("%s", fz_caught_message(ctx));
+				fz_report_error(ctx);
 			}
 		}
 	}
@@ -551,6 +555,7 @@ static void open_stamp_image_dialog(void)
 			fz_catch(ctx)
 			{
 				ui_show_warning_dialog("%s", fz_caught_message(ctx));
+				fz_report_error(ctx);
 			}
 		}
 	}
@@ -1434,7 +1439,7 @@ void do_redact_panel(void)
 	int i;
 
 	int num_redact = 0;
-	static pdf_redact_options redact_opts = { 1, PDF_REDACT_IMAGE_PIXELS };
+	static pdf_redact_options redact_opts = { 1, PDF_REDACT_IMAGE_PIXELS, PDF_REDACT_LINE_ART_REMOVE_IF_TOUCHED };
 	int search_valid;
 
 	if (pdf_has_redactions_doc != pdf)
@@ -1481,9 +1486,10 @@ void do_redact_panel(void)
 	if (ui_button_aux("Redact Page", num_redact == 0))
 	{
 		ui_select_annot(NULL);
-		trace_action("page.applyRedactions(%s, %d);\n",
+		trace_action("page.applyRedactions(%s, %d, %d);\n",
 			redact_opts.black_boxes ? "true" : "false",
-			redact_opts.image_method);
+			redact_opts.image_method,
+			redact_opts.line_art);
 		pdf_redact_page(ctx, pdf, page, &redact_opts);
 		trace_page_update();
 		load_page();
@@ -1746,7 +1752,7 @@ static void do_edit_line(fz_irect canvas_area, fz_irect area, fz_rect *rect)
 		rect->y0 = fz_min(a.y, b.y);
 		rect->x1 = fz_max(a.x, b.x);
 		rect->y1 = fz_max(a.y, b.y);
-		lw = pdf_annot_border(ctx, ui.selected_annot);
+		lw = pdf_annot_border_width(ctx, ui.selected_annot);
 		*rect = fz_expand_rect(*rect, fz_matrix_expansion(view_page_ctm) * lw);
 
 		/* cancel on right click */
