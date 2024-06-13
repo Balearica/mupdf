@@ -938,4 +938,6 @@ void pdf_set_annot_hidden_for_editing(fz_context *ctx, pdf_annot *annot, int hid
  */
 int pdf_apply_redaction(fz_context *ctx, pdf_annot *annot, pdf_redact_options *opts);
 
+void pdf_highlight_page(fz_document *doc, fz_context *ctx, int number, int x0, int y0, int x1, int y1);
+
 #endif

@@ -22,8 +22,8 @@ import os
 import platform
 import re
 import shutil
-import site
-import setuptools
+# import site
+# import setuptools
 import subprocess
 import sys
 import sysconfig

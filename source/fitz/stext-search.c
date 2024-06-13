@@ -226,38 +226,34 @@ fz_enumerate_selection(fz_context *ctx, fz_stext_page *page, fz_point a, fz_poin
 	fz_stext_block *block;
 	fz_stext_line *line;
 	fz_stext_char *ch;
-	int idx, start, end;
-	int inside;
 
-	start = find_closest_in_page(page, a);
-	end = find_closest_in_page(page, b);
+	int min_x = fz_min(a.x, b.x);
+	int min_y = fz_min(a.y, b.y);
+	int max_x = fz_max(a.x, b.x);
+	int max_y = fz_max(a.y, b.y);
 
-	if (start > end)
-		idx = start, start = end, end = idx;
-
-	if (start == end)
-		return;
-
-	inside = 0;
-	idx = 0;
 	for (block = page->first_block; block; block = block->next)
 	{
-		if (block->type != FZ_STEXT_BLOCK_TEXT)
+		if (block->type != FZ_STEXT_BLOCK_TEXT) {
 			continue;
+		}
+			
 		for (line = block->u.t.first_line; line; line = line->next)
 		{
 			for (ch = line->first_char; ch; ch = ch->next)
 			{
-				if (!inside)
-					if (idx == start)
-						inside = 1;
-				if (inside)
-					cb->on_char(ctx, cb->arg, line, ch);
-				if (++idx == end)
-					return;
+
+				if (ch->quad.ll.x > max_x || ch->quad.ll.y > max_y || ch->quad.lr.x < min_x || ch->quad.lr.y < min_y) {
+					continue;
+				}
+
+				if (ch->c == ' ' || ch->c == '\n' || ch->c == '\r' || ch->c == '\t') {
+					continue;
+				}
+
+				cb->on_char(ctx, cb->arg, line, ch);
+					
 			}
-			if (inside)
-				cb->on_line(ctx, cb->arg, line);
 		}
 	}
 }
@@ -361,8 +357,9 @@ static void on_highlight_char(fz_context *ctx, void *arg, fz_stext_line *line, f
 	fz_point dir = line->dir;
 
 	// Skip zero-extent quads
-	if (same_point(ch->quad.ll, ch->quad.lr))
+	if (same_point(ch->quad.ll, ch->quad.lr)) {
 		return;
+	}
 
 	if (hits->len > 0)
 	{
@@ -371,16 +368,23 @@ static void on_highlight_char(fz_context *ctx, void *arg, fz_stext_line *line, f
 		if (is_near(hfuzz, vfuzz, dir, end->lr, ch->quad.ll, ch->quad.lr) &&
 			is_near(hfuzz, vfuzz, dir, end->ur, ch->quad.ul, ch->quad.ur))
 		{
-			end->ur = ch->quad.ur;
-			end->lr = ch->quad.lr;
+			if (ch->quad.ur.x > end->ur.x) {
+				end->ur = ch->quad.ur;
+				end->lr = ch->quad.lr;
+			}
+
 			return;
 		}
 
 		if (is_near(hfuzz, vfuzz, dir, end->ll, ch->quad.lr, ch->quad.ll) &&
 			is_near(hfuzz, vfuzz, dir, end->ul, ch->quad.ur, ch->quad.ul))
 		{
-			end->ul = ch->quad.ul;
-			end->ll = ch->quad.ll;
+
+			if (ch->quad.ul.x < end->ul.x) {
+				end->ul = ch->quad.ul;
+				end->ll = ch->quad.ll;
+			}
+
 			return;
 		}
 	}
@@ -402,7 +406,7 @@ fz_highlight_selection(fz_context *ctx, fz_stext_page *page, fz_point a, fz_poin
 	hits.len = 0;
 	hits.cap = max_quads;
 	hits.box = quads;
-	hits.hfuzz = 0.5f; /* merge large gaps */
+	hits.hfuzz = 2.0f; /* merge large gaps */
 	hits.vfuzz = 0.1f;
 
 	cb.on_char = on_highlight_char;
