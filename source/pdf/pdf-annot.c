@@ -1000,6 +1000,7 @@ static pdf_obj *rect_subtypes[] = {
 	PDF_NAME(Sound),
 	PDF_NAME(Movie),
 	PDF_NAME(Widget),
+	PDF_NAME(Highlight),
 	NULL,
 };
 
@@ -3473,7 +3474,7 @@ pdf_set_annot_hidden_for_editing(fz_context *ctx, pdf_annot *annot, int hidden)
 }
 
 
-void pdf_highlight_page(fz_document *doc, fz_context *ctx, int number, int x0, int y0, int x1, int y1)
+void pdf_highlight_page(pdf_document *doc, fz_context *ctx, int number, int x0, int y0, int x1, int y1)
 {
 	static const float yellow_orange[3] = { 1.0f, 0.784f, 0.0f };
 
