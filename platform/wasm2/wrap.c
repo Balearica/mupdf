@@ -306,9 +306,16 @@ int checkNativeText(fz_document *doc, int extract_text)
     }
 }
 
+typedef struct {
+    int letterCountTotal;
+    int letterCountVis;
+	unsigned char *data;
+} PageTextResults;
+
+static PageTextResults pageTextRes = {0, 0, NULL};
 
 EMSCRIPTEN_KEEPALIVE
-char *pageText(fz_document *doc, int pagenum, float dpi, int format, int skip_text_invis)
+PageTextResults* pageText(fz_document *doc, int pagenum, float dpi, int format, int skip_text_invis, int calc_stats, int extract_text)
 {
 	static unsigned char *data = NULL;
 	fz_rect mediabox;
@@ -316,6 +323,8 @@ char *pageText(fz_document *doc, int pagenum, float dpi, int format, int skip_te
 
 	float zoom;
 	float rotation = 0;
+	int letterCountTotalI = 0;
+	int letterCountVisI = 0;
 
 	fz_stext_page *stext_page = NULL;
 	fz_buffer *buf = NULL;
@@ -335,46 +344,79 @@ char *pageText(fz_document *doc, int pagenum, float dpi, int format, int skip_te
 		zoom = dpi / 72;
 		ctm = fz_pre_scale(fz_rotate(rotation), zoom, zoom);
 
-		fz_stext_options stext_options;
-
-		buf = fz_new_buffer(ctx, 0);
-		out = fz_new_output_with_buffer(ctx, buf);
-
+		fz_stext_options stext_options = { 0 };
 
 		tmediabox = fz_transform_rect(mediabox, ctm);
 		stext_page = fz_new_stext_page(ctx, tmediabox);
 		dev = fz_new_stext_device(ctx, stext_page, &stext_options);
 
 		fz_cookie cookie = {0};
-		if (skip_text_invis) {
-			cookie.skip_text_invis = 1;
-		} else {
-			cookie.skip_text_invis = 0;
-		}
+		cookie.skip_text_invis = skip_text_invis;
 
 		fz_run_page(ctx, page, dev, ctm, &cookie);
-		fz_close_device(ctx, dev);
-		fz_drop_device(ctx, dev);
-		dev = NULL;
 
-		// Format numbers are copied from mutool draw for consistency
-		// See "mudraw.c"
-		if (format == 0) {
-			fz_print_stext_page_as_text(ctx, out, stext_page);
-		} else if (format == 1) {
-			fz_print_stext_page_as_html(ctx, out, stext_page, pagenum);
-		} else if (format == 2) {
-			fz_print_stext_page_as_xhtml(ctx, out, stext_page, pagenum);
-		} else if (format == 3) {
-			fz_print_stext_page_as_xml(ctx, out, stext_page, pagenum);
-		} else {
-			fz_print_stext_page_as_json(ctx, out, stext_page, 1.0);
+		// The "close device" step contributes to output (it sets bounding boxes), so this needs to be run before the text is extracted.
+		fz_close_device(ctx, dev);
+
+
+		if (calc_stats) {
+			if (cookie.skip_text_invis) {
+				letterCountVisI = count_stext_page_letters(ctx, stext_page);
+			} else {
+				letterCountTotalI = count_stext_page_letters(ctx, stext_page);
+			}
 		}
 
-		fz_close_output(ctx, out);
-		fz_terminate_buffer(ctx, buf);
+		if (extract_text) {
+			buf = fz_new_buffer(ctx, 0);
+			out = fz_new_output_with_buffer(ctx, buf);
 
-		fz_buffer_extract(ctx, buf, &data);
+			// Format numbers are copied from mutool draw for consistency
+			// See "mudraw.c"
+			if (format == 0) {
+				fz_print_stext_page_as_text(ctx, out, stext_page);
+			} else if (format == 1) {
+				fz_print_stext_page_as_html(ctx, out, stext_page, pagenum);
+			} else if (format == 2) {
+				fz_print_stext_page_as_xhtml(ctx, out, stext_page, pagenum);
+			} else if (format == 3) {
+				fz_print_stext_page_as_xml(ctx, out, stext_page, pagenum);
+			} else {
+				fz_print_stext_page_as_json(ctx, out, stext_page, 1.0);
+			}
+
+			fz_close_output(ctx, out);
+			fz_terminate_buffer(ctx, buf);
+
+			fz_buffer_extract(ctx, buf, &data);
+		}
+
+		// Stats are calculated by running the page twice, once with invisible text included and once without.
+		// There is almost certainly a more efficient way to do this, where we run the text once and count the number of both types of characters,
+		// but it unclear how to do this without making significant changes to the MuPDF codebase.
+		// Therefore, we re-run the page here with whatever option was not selected by the user for the purpose of extracting text.
+		if (calc_stats) {
+			fz_drop_device(ctx, dev);
+			dev = NULL;
+
+			cookie.skip_text_invis = !cookie.skip_text_invis;
+
+			fz_drop_stext_page(ctx, stext_page);
+			stext_page = NULL;
+
+			// Calculate number of visible letters on the page
+			stext_page = fz_new_stext_page(ctx, tmediabox);
+			dev = fz_new_stext_device(ctx, stext_page, &stext_options);
+
+			fz_run_page(ctx, page, dev, ctm, &cookie);
+			fz_close_device(ctx, dev);
+
+			if (cookie.skip_text_invis) {
+				letterCountVisI = count_stext_page_letters(ctx, stext_page);
+			} else {
+				letterCountTotalI = count_stext_page_letters(ctx, stext_page);
+			}
+		}
 
 	}
 	fz_always(ctx)
@@ -391,7 +433,11 @@ char *pageText(fz_document *doc, int pagenum, float dpi, int format, int skip_te
 		fz_rethrow(ctx);
 	}
 
-	return (char*)data;
+	pageTextRes.data = data;
+	pageTextRes.letterCountTotal = letterCountTotalI;
+	pageTextRes.letterCountVis = letterCountVisI;
+
+	return &pageTextRes;
 }
 
 static fz_buffer *lastDrawBuffer = NULL;

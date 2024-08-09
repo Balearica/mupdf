@@ -4,7 +4,7 @@
 ## A better solution may be possible
 rm -rf ../../build/wasm2
 
-source /home/user/Documents/dev/emsdk/emsdk_env.sh
+source /home/user/dev/emsdk/emsdk_env.sh
 
 echo Building generated files:
 make -j4 -C ../.. generate
@@ -50,6 +50,7 @@ make -j4 -C ../.. \
 	XCFLAGS="-DTOFU -DTOFU_CJK -DFZ_ENABLE_SVG=0 -DFZ_ENABLE_HTML=0 -DFZ_ENABLE_EPUB=0 -DFZ_ENABLE_JS=0 -DFZ_ENABLE_ICC=0 -DFZ_ENABLE_XPS=0 -DFZ_ENABLE_CBZ=0 -DFZ_ENABLE_IMG=0 -DFZ_ENABLE_OCR_OUTPUT=0 -DFZ_ENABLE_DOCX_OUTPUT=0 -DFZ_ENABLE_ODT_OUTPUT=0" \
 	libs
 
+## TODO: I believe the following is no longer true as a bug was fixed.  We can consider switching to "Os" optimization.
 ## Note: Compiling with "Os" optimization was found to introduce a significant bug, which was not present for "O3".
 ## Therefore, despite the larger file size, "O3" is used for the final build.
 ## Specifically, when "0s" was used, flags were being changed in a non-deterministic way, without any code to change them.
@@ -64,7 +65,7 @@ emcc -Wall -O3 -g1 -o libmupdf.js \
 	-s ABORTING_MALLOC=0 \
 	-s ALLOW_MEMORY_GROWTH=1 \
 	-s MAXIMUM_MEMORY=4GB \
-	-s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
+	-s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","getValue","UTF8ToString"]' \
 	-s EXPORTED_FUNCTIONS='["_malloc","_free"]' \
 	-s FORCE_FILESYSTEM \
 	-I ../../include \
