@@ -119,6 +119,7 @@ typedef struct
 	fz_matrix trm;
 	int new_obj;
 	int lastchar;
+	float lastsize;
 	int lastbidi;
 	int flags;
 	int color;
@@ -489,6 +490,7 @@ fz_add_stext_char_imp(fz_context *ctx, fz_stext_device *dev, fz_font *font, int 
 		add_char_to_line(ctx, page, cur_line, trm, font, size, c, &dev->pen, &dev->pen, bidi, dev->color);
 		dev->lastbidi = bidi;
 		dev->lastchar = c;
+		dev->lastsize = size;
 		return;
 	}
 
@@ -519,7 +521,7 @@ fz_add_stext_char_imp(fz_context *ctx, fz_stext_device *dev, fz_font *font, int 
 		base_offset = (-ndir.y * delta.x + ndir.x * delta.y) / size;
 
 		/* Only a small amount off the baseline - we'll take this */
-		if (fabsf(base_offset) < BASE_MAX_DIST)
+		if (fabsf(base_offset) < BASE_MAX_DIST / 2 || size != dev->lastsize && fabsf(base_offset) < BASE_MAX_DIST)
 		{
 			/* If mixed LTR and RTL content */
 			if ((bidi & 1) != (dev->lastbidi & 1))
@@ -586,7 +588,7 @@ fz_add_stext_char_imp(fz_context *ctx, fz_stext_device *dev, fz_font *font, int 
 					/* Motion is in line and small enough to ignore. */
 					new_line = 0;
 				}
-				else if (spacing > 0 && spacing < SPACE_MAX_DIST)
+				else if ((spacing > 0 || dev->lastchar == ' ' && spacing > -1) && spacing < SPACE_MAX_DIST)
 				{
 					/* Motion is forward in line and large enough to warrant us adding a space. */
 					if (wmode == 0 && may_add_space(dev->lastchar))
@@ -645,6 +647,7 @@ fz_add_stext_char_imp(fz_context *ctx, fz_stext_device *dev, fz_font *font, int 
 
 	add_char_to_line(ctx, page, cur_line, trm, font, size, c, &p, &q, bidi, dev->color);
 	dev->lastchar = c;
+	dev->lastsize = size;
 	dev->lastbidi = bidi;
 	dev->lag_pen = p;
 	dev->pen = q;
