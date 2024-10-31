@@ -162,6 +162,8 @@ mupdf.pageText = function (doc, {
 
   const content = Module.UTF8ToString(dataPtr);
 
+  Module._free(dataPtr);
+
   return {
     letterCountTotal,
     letterCountVis,
