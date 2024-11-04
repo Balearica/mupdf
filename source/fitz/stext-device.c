@@ -583,7 +583,7 @@ fz_add_stext_char_imp(fz_context *ctx, fz_stext_device *dev, fz_font *font, int 
 			/* LTR or neutral character */
 			else
 			{
-				if (fabsf(spacing) < SPACE_DIST)
+				if (spacing > -0.5 && spacing < SPACE_DIST)
 				{
 					/* Motion is in line and small enough to ignore. */
 					new_line = 0;
