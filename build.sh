@@ -75,4 +75,8 @@ emcc -Wall -O3 -g1 -o libmupdf.js \
 sed -i 's/var FS = {/export var FS = {/g' libmupdf.js
 sed -i 's/var Module = typeof/export var Module = typeof/g' libmupdf.js
 
+## Edit so that paths work with Webpack
+## This requires setting the file path to an explicit URL (with the path hard-coded in the constructor).
+sed -i 's/var wasmBinaryFile;/var wasmBinaryFile;\nconst wasmBinaryFileURL = new URL(".\/libmupdf.wasm", import.meta.url);\nif (typeof process === "undefined") wasmBinaryFile = wasmBinaryFileURL.href;\n/' libmupdf.js
+
 echo Done.
