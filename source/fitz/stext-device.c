@@ -409,8 +409,9 @@ static int may_add_space(int lastchar)
 	 * general punctuation,
 	 * superscripts and subscripts,
 	 * and currency symbols.
+	 * Additionally additions: geometric shapes.
 	 */
-	return (lastchar != ' ' && (lastchar < 0x700 || (lastchar >= 0x2000 && lastchar <= 0x20CF)));
+	return (lastchar != ' ' && (lastchar < 0x700 || (lastchar >= 0x2000 && lastchar <= 0x20CF) || (lastchar >= 0x25A0 && lastchar <= 0x25CF)));
 }
 
 static void
@@ -591,7 +592,7 @@ fz_add_stext_char_imp(fz_context *ctx, fz_stext_device *dev, fz_font *font, int 
 				else if ((spacing > 0 || dev->lastchar == ' ' && spacing > -1) && spacing < SPACE_MAX_DIST)
 				{
 					/* Motion is forward in line and large enough to warrant us adding a space. */
-					if (wmode == 0 && may_add_space(dev->lastchar))
+					if (spacing > 0.5 || wmode == 0 && may_add_space(dev->lastchar))
 						add_space = 1;
 					new_line = 0;
 				}
