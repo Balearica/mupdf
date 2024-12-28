@@ -24,15 +24,28 @@
 // import Worker from 'web-worker';
 
 export async function initMuPDFWorker() {
-  // Define `Worker` in Node.js version.
-  const Worker = globalThis.Worker || (await import('web-worker')).default;
+  // This method of creating workers works natively in the browser, Node.js, and Webpack 5.
+  // Do not change without confirming compatibility with all three.
   const mupdf = {};
-  const url = new URL('./mupdf-worker.js', import.meta.url).href;
-  const worker = new Worker(url, { type: 'module' });
+  let worker;
+  if (typeof process === 'undefined') {
+    worker = new Worker(new URL('./mupdf-worker.js', import.meta.url), { type: 'module' });
+  } else {
+    const WorkerNode = (await import('worker_threads')).Worker;
+    worker = new WorkerNode(new URL('./mupdf-worker.js', import.meta.url));
+  }
 
-  worker.onerror = function (error) {
-    throw error;
+  const errorHandler = (err) => {
+    console.error(err);
   };
+
+  if (typeof process === 'undefined') {
+    // @ts-ignore
+    worker.onerror = errorHandler;
+  } else {
+    // @ts-ignore
+    worker.on('error', errorHandler);
+  }
 
   let readyResolve;
   const readyPromise = new Promise((resolve, reject) => {
@@ -41,12 +54,13 @@ export async function initMuPDFWorker() {
 
   worker.promises = {};
   worker.promiseId = 0;
-  worker.onmessage = async function (event) {
-    if (typeof event.data === 'string' && event.data === 'READY') {
+
+  const messageHandler = async (data) => {
+    if (typeof data === 'string' && data === 'READY') {
       readyResolve();
       return;
     }
-    const [type, id, result] = event.data;
+    const [type, id, result] = data;
     if (type === 'RESULT') {
       // worker.promises[id].resolve(result);
       if (['drawPageAsPNG'].includes(worker.promises[id].func)) {
@@ -64,11 +78,19 @@ export async function initMuPDFWorker() {
     }
   };
 
+  if (typeof process === 'undefined') {
+    // @ts-ignore
+    worker.onmessage = (event) => messageHandler(event.data);
+  } else {
+    // @ts-ignore
+    worker.on('message', messageHandler);
+  }
+
   function wrap(func) {
     return function (...args) {
       return new Promise((resolve, reject) => {
         // Add the PDF as the first argument for most functions
-        if (!['openDocument', 'cleanFile'].includes(func)) {
+        if (!['openDocument', 'cleanFile', 'freeDocument'].includes(func)) {
           // Remove job number (appended by Tesseract scheduler function)
           // args = args.slice(0,-1)
 
