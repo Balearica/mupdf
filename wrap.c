@@ -306,6 +306,12 @@ int checkNativeText(fz_document *doc, int extract_text)
     }
 }
 
+EMSCRIPTEN_KEEPALIVE
+void pdfOverlayDocuments(pdf_document *doc_base, pdf_document *doc_text)
+{
+	pdf_overlay_documents(ctx, doc_base, doc_text);
+}
+
 typedef struct {
     int letterCountTotal;
     int letterCountVis;
