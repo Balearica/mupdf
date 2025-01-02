@@ -597,46 +597,10 @@ static void runpage(int number, fz_document *doc, fz_document_writer *out, int p
 	}
 }
 
-
-
 EMSCRIPTEN_KEEPALIVE
-void overlayPDFText(fz_document *doc, fz_document *doc2, int minpage, int maxpage, int pagewidth, int pageheight, int humanReadable, int skip_text)
+static void addPageImage(int number, fz_document_writer *out, int pagewidth, int pageheight, float angle)
 {
-	fz_document_writer *out;
 
-	fz_page *page;
-
-	char *output = "/download.pdf";
-
-	char *optionsDefault = "compress";
-	char *optionsHumanReadable = "ascii,decompress,pretty,compress-images,compress-fonts";
-	char *options = humanReadable == 1 ? optionsHumanReadable : optionsDefault;
-
-	out = fz_new_pdf_writer(ctx, output, options);
-
-	int count = fz_count_pages(ctx, doc);
-
-	if (maxpage == -1) {
-		maxpage = count-1;
-	}
-
-	for (int i=minpage; i<=maxpage; i++) {
-
-		runpageOverlayPDF(i, doc, doc2, out, pagewidth, pageheight, skip_text);
-
-	}
-
-	fz_close_document_writer(ctx, out);
-	fz_drop_document_writer(ctx, out);
-
-}
-
-EMSCRIPTEN_KEEPALIVE
-static void runpageOverlayImage(int number, fz_document *doc, fz_document_writer *out, int pagewidth, int pageheight, float angle)
-{
-	fz_rect mediabox;
-
-	fz_page *page;
 	fz_device *dev = NULL;
 
 	fz_matrix immat;
@@ -645,8 +609,6 @@ static void runpageOverlayImage(int number, fz_document *doc, fz_document_writer
 	fz_matrix transmat2;
 
 	fz_image *background_img;
-
-	page = fz_load_page(ctx, doc, number);
 
 	fz_var(dev);
 
@@ -658,7 +620,7 @@ static void runpageOverlayImage(int number, fz_document *doc, fz_document_writer
 
 		background_img = fz_new_image_from_file(ctx, path);
 
-		mediabox = fz_bound_page(ctx, page);
+		fz_rect mediabox = { 0, 0, background_img->w, background_img->h };
 
 		// Change width/height to user-specified values (if applicable)
 		if (pagewidth > 0 && pageheight > 0) {
@@ -684,18 +646,12 @@ static void runpageOverlayImage(int number, fz_document *doc, fz_document_writer
 
 		fz_fill_image(ctx, dev, background_img, immat, 1.0f, fz_default_color_params);
 
-		fz_cookie cookie = {0};
-		cookie.skip_text = 0;
-
-		fz_run_page(ctx, page, dev, fz_identity, &cookie);
-
 		fz_end_page(ctx, out);
 
 	}
 	fz_always(ctx)
 	{
 		fz_drop_image(ctx, background_img);
-		fz_drop_page(ctx, page);
 	}
 	fz_catch(ctx) {
 		fz_report_error(ctx);
@@ -703,77 +659,53 @@ static void runpageOverlayImage(int number, fz_document *doc, fz_document_writer
 	}
 }
 
-// Unlike for combining multiple PDF documents (overlayPDFText), when creating a PDF from images,
-// a function is invoked from JavaScript for each individual page.
-// This avoids an issue where many copies of the same images are created in different processes
-// for (potentially) hundreds of different images. 
-static fz_document_writer *out;
+static fz_document_writer *out_ci;
+
 EMSCRIPTEN_KEEPALIVE
-void overlayPDFTextImageStart(int humanReadable){
+void convertImageStart(int humanReadable)
+{
 	char *output = "/download.pdf";
 
 	char *optionsDefault = "compress";
 	char *optionsHumanReadable = "ascii,decompress,pretty,compress-images,compress-fonts";
 	char *options = humanReadable == 1 ? optionsHumanReadable : optionsDefault;
-	out = fz_new_pdf_writer(ctx, output, options);
+	out_ci = fz_new_pdf_writer(ctx, output, options);
 }
 
 EMSCRIPTEN_KEEPALIVE
-void overlayPDFTextImageAddPage(fz_document *doc, int i, int pagewidth, int pageheight, float angle){
+void convertImageAddPage(int i, int pagewidth, int pageheight, float angle)
+{
 
-	runpageOverlayImage(i, doc, out, pagewidth, pageheight, angle);
+	addPageImage(i, out_ci, pagewidth, pageheight, angle);
 	
 }
 
 EMSCRIPTEN_KEEPALIVE
-void overlayPDFTextImageEnd(){
-	fz_close_document_writer(ctx, out);
-	fz_drop_document_writer(ctx, out);
-}
-
-
-EMSCRIPTEN_KEEPALIVE
-void overlayPDFTextImage(fz_document *doc, int minpage, int maxpage, int pagewidth, int pageheight, int humanReadable)
+void convertImageEnd()
 {
-	fz_document_writer *out;
-
-	fz_page *page;
-
-	char *output = "/download.pdf";
-	char *optionsDefault = "compress";
-	char *optionsHumanReadable = "ascii,decompress,pretty,compress-images,compress-fonts";
-	char *options = humanReadable == 1 ? optionsHumanReadable : optionsDefault;
-
-	out = fz_new_pdf_writer(ctx, output, options);
-
-	int count = fz_count_pages(ctx, doc);
-
-	if (maxpage == -1) {
-		maxpage = count-1;
-	}
-
-	for (int i=minpage; i<=maxpage; i++) {
-
-		runpageOverlayImage(i, doc, out, pagewidth, pageheight, 0.0);
-
-	}
-
-	fz_close_document_writer(ctx, out);
-	fz_drop_document_writer(ctx, out);
-
+	fz_close_document_writer(ctx, out_ci);
+	fz_drop_document_writer(ctx, out_ci);
 }
 
 EMSCRIPTEN_KEEPALIVE
-void writePDF(fz_document *doc, int minpage, int maxpage, int pagewidth, int pageheight, int humanReadable)
+void runPDF(fz_document *doc, int minpage, int maxpage, int pagewidth, int pageheight, int humanReadable, int altFontKeys)
 {
 	fz_document_writer *out;
 
 	char *output = "/download.pdf";
-	char *optionsDefault = "compress";
-	char *optionsHumanReadable = "ascii,decompress,pretty,compress-images,compress-fonts";
-	char *options = humanReadable == 1 ? optionsHumanReadable : optionsDefault;
 
-	out = fz_new_pdf_writer(ctx, output, options);
+	char buf[256];
+	if (humanReadable) {
+		snprintf(buf, sizeof(buf), "ascii,decompress,pretty,compress-images,compress-fonts");
+	} else {
+		snprintf(buf, sizeof(buf), "compress");
+	}
+
+	if (altFontKeys) {
+		snprintf(buf, sizeof(buf), "%s,alt-font-keys", buf);
+	}
+
+	out = fz_new_pdf_writer(ctx, output, &buf);
 
 	int count = fz_count_pages(ctx, doc);
 
@@ -792,6 +724,59 @@ void writePDF(fz_document *doc, int minpage, int maxpage, int pagewidth, int pag
 
 }
 
+EMSCRIPTEN_KEEPALIVE
+void pdfSubsetPages(pdf_document *doc, int minpage, int maxpage) 
+{
+	int *pages = NULL;
+	int cap, len, page;
+
+	fz_var(doc);
+	fz_var(pages);
+
+	len = cap = 0;
+
+	int pagecount = pdf_count_pages(ctx, doc);
+
+	if (maxpage == -1 || maxpage >= pagecount) {
+		maxpage = pagecount-1;
+	}
+
+	if (len + (maxpage - minpage + 1) >= cap)
+	{
+		int n = cap ? cap * 2 : 8;
+		while (len + (maxpage - minpage + 1) >= n) 
+			n *= 2;
+		pages = fz_realloc_array(ctx, pages, n, int);
+		cap = n;
+	}
+
+	for (page = minpage; page <= maxpage; ++page)
+		pages[len++] = page;
+
+	pdf_rearrange_pages(ctx, doc, len, pages);
+
+}
+
+EMSCRIPTEN_KEEPALIVE
+void pdfSaveDocument(pdf_document *doc, int minpage, int maxpage, int pagewidth, int pageheight, int humanReadable, int skipTextInvis)
+{
+	char *output = "/download.pdf";
+
+	pdf_write_options opts = pdf_default_write_options;
+	char *options;
+	if (humanReadable && skipTextInvis) {
+		options = "ascii,decompress,pretty,compress-images,compress-fonts,skip-text-invis";
+	} else if (humanReadable) {
+		options = "ascii,decompress,pretty,compress-images,compress-fonts";
+	} else if (skipTextInvis) {
+		options = "compress,skip-text-invis";
+	} else {
+		options = "compress";
+	}
+
+	pdf_parse_write_options(ctx, &opts, options);
+	pdf_save_document(ctx, doc, output, &opts);
+}
 
 EMSCRIPTEN_KEEPALIVE
 unsigned char *getLastDrawData(void)
