@@ -54,6 +54,8 @@ typedef struct pdf_filter_gstate
 		char name[256];
 		fz_colorspace *cs;
 	} cs, CS;
+	float ca;
+	float CA;
 	pdf_filter_gstate_sc sc, SC;
 	struct
 	{
@@ -571,6 +573,10 @@ filter_show_char(fz_context *ctx, pdf_sanitize_processor *p, int cid, int *unico
 	int ucsbuf[PDF_MRANGE_CAP];
 	int ucslen;
 	int remove = 0;
+	int dofill;
+	int dostroke;
+	int doclip;
+	int doinvisible;
 
 	(void)pdf_tos_make_trm(ctx, &p->tos, &gstate->pending.text, fontdesc, cid, &trm);
 
@@ -611,6 +617,26 @@ filter_show_char(fz_context *ctx, pdf_sanitize_processor *p, int cid, int *unico
 			bbox.x1 = font_bbox.x1;
 			bbox.y0 = 0;
 			bbox.y1 = fz_advance_glyph(ctx, fontdesc->font, p->tos.gid, 1);
+		}
+		
+		if (p->global_options->skip_text_invis) {
+			dofill = dostroke = doclip = doinvisible = 0;
+
+			switch (p->tos.text_mode)
+			{
+			case 0: dofill = 1; break;
+			case 1: dostroke = 1; break;
+			case 2: dofill = dostroke = 1; break;
+			case 3: doinvisible = 1; break;
+			case 4: dofill = doclip = 1; break;
+			case 5: dostroke = doclip = 1; break;
+			case 6: dofill = dostroke = doclip = 1; break;
+			case 7: doclip = 1; break;
+			}
+
+			if (p->super.hidden || (!dofill || gstate->pending.ca == 0.0f) && (!dostroke || gstate->pending.CA == 0.0f)) {
+				return 1;
+			}
 		}
 
 		if (p->options->text_filter)
@@ -1170,9 +1196,12 @@ static void
 pdf_filter_gs_CA(fz_context *ctx, pdf_processor *proc, float alpha)
 {
 	pdf_sanitize_processor *p = (pdf_sanitize_processor*)proc;
+	filter_gstate *gstate = gstate_to_update(ctx, p);
 
 	if (fz_is_empty_rect(p->gstate->clip_rect))
 		return;
+
+	p->gstate->pending.CA = alpha;
 
 	if (p->chain->op_gs_CA)
 		p->chain->op_gs_CA(ctx, p->chain, alpha);
@@ -1182,9 +1211,12 @@ static void
 pdf_filter_gs_ca(fz_context *ctx, pdf_processor *proc, float alpha)
 {
 	pdf_sanitize_processor *p = (pdf_sanitize_processor*)proc;
+	filter_gstate *gstate = gstate_to_update(ctx, p);
 
 	if (fz_is_empty_rect(p->gstate->clip_rect))
 		return;
+
+	p->gstate->pending.ca = alpha;
 
 	if (p->chain->op_gs_ca)
 		p->chain->op_gs_ca(ctx, p->chain, alpha);
@@ -3003,7 +3035,8 @@ pdf_new_sanitize_filter(
 		fz_rethrow(ctx);
 	}
 
-	proc->super.requirements = proc->chain->requirements;
+	// Prevent images from being decoded/recoded.
+	proc->super.requirements = 0;
 
 	return (pdf_processor*)proc;
 }

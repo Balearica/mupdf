@@ -688,24 +688,20 @@ void convertImageEnd()
 }
 
 EMSCRIPTEN_KEEPALIVE
-void runPDF(fz_document *doc, int minpage, int maxpage, int pagewidth, int pageheight, int humanReadable, int altFontKeys)
+void runPDF(fz_document *doc, int minpage, int maxpage, int pagewidth, int pageheight, int humanReadable)
 {
 	fz_document_writer *out;
 
 	char *output = "/download.pdf";
 
-	char buf[256];
+	char *options;
 	if (humanReadable) {
-		snprintf(buf, sizeof(buf), "ascii,decompress,pretty,compress-images,compress-fonts");
+		options = "ascii,decompress,pretty,compress-images,compress-fonts";
 	} else {
-		snprintf(buf, sizeof(buf), "compress");
+		options = "compress";
 	}
 
-	if (altFontKeys) {
-		snprintf(buf, sizeof(buf), "%s,alt-font-keys", buf);
-	}
-
-	out = fz_new_pdf_writer(ctx, output, &buf);
+	out = fz_new_pdf_writer(ctx, output, options);
 
 	int count = fz_count_pages(ctx, doc);
 
@@ -758,23 +754,30 @@ void pdfSubsetPages(pdf_document *doc, int minpage, int maxpage)
 }
 
 EMSCRIPTEN_KEEPALIVE
-void pdfSaveDocument(pdf_document *doc, int minpage, int maxpage, int pagewidth, int pageheight, int humanReadable, int skipTextInvis)
+void pdfSaveDocument(pdf_document *doc, int minpage, int maxpage, int pagewidth, int pageheight, int humanReadable, int skipTextInvis, int delGarbage)
 {
 	char *output = "/download.pdf";
 
 	pdf_write_options opts = pdf_default_write_options;
-	char *options;
-	if (humanReadable && skipTextInvis) {
-		options = "ascii,decompress,pretty,compress-images,compress-fonts,skip-text-invis";
-	} else if (humanReadable) {
-		options = "ascii,decompress,pretty,compress-images,compress-fonts";
-	} else if (skipTextInvis) {
-		options = "compress,skip-text-invis";
+
+	if (humanReadable) {
+		opts.do_ascii = 1;
+		opts.do_decompress = 1;
+		opts.do_pretty = 1;
+		opts.do_compress_images = 1;
+		opts.do_compress_fonts = 1;
 	} else {
-		options = "compress";
+		opts.do_compress = 1;
 	}
 
-	pdf_parse_write_options(ctx, &opts, options);
+	if (delGarbage) {
+		opts.do_garbage = 1;
+	}
+
+	if (skipTextInvis) {
+		opts.do_skip_text_invis = 1;
+	}
+
 	pdf_save_document(ctx, doc, output, &opts);
 }
 

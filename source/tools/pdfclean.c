@@ -61,6 +61,7 @@ static int usage(void)
 		"\t-i\tcompress image streams\n"
 		"\t-c\tclean content streams\n"
 		"\t-s\tsanitize content streams\n"
+		"\t-v\tkeep only visible text, remove invisible text\n"
 		"\t-t\t'tighten' objects\n"
 		"\t-A\tcreate appearance streams for annotations\n"
 		"\t-AA\trecreate appearance streams for annotations\n"
@@ -127,7 +128,7 @@ int pdfclean_main(int argc, char **argv)
 	opts.write = pdf_default_write_options;
 	opts.write.dont_regenerate_id = 1;
 
-	while ((c = fz_getopt_long(argc, argv, "ade:fgilmp:stczDAE:O:U:P:SZ", longopts)) != -1)
+	while ((c = fz_getopt_long(argc, argv, "ade:fgilmp:svtczDAE:O:U:P:SZ", longopts)) != -1)
 	{
 		switch (c)
 		{
@@ -143,6 +144,7 @@ int pdfclean_main(int argc, char **argv)
 		case 'l': opts.write.do_linear += 1; break;
 		case 'c': opts.write.do_clean += 1; break;
 		case 's': opts.write.do_sanitize += 1; break;
+		case 'v': opts.write.do_skip_text_invis += 1; break;
 		case 't': tighten = 1; break;
 		case 'A': opts.write.do_appearance += 1; break;
 

@@ -33,8 +33,10 @@ function arrayBufferToBase64(arrayBuffer) {
   const byteRemainder = byteLength % 3;
   const mainLength = byteLength - byteRemainder;
 
-  let a; let b; let c; let
-    d;
+  let a; 
+  let b; 
+  let c; 
+  let d;
   let chunk;
 
   // Main loop deals with bytes in chunks of 3
@@ -120,7 +122,7 @@ Module.onRuntimeInitialized = function () {
   wasm_convertImageAddPage = Module.cwrap('convertImageAddPage', 'null', ['number', 'number', 'number', 'number', 'number']);
   wasm_convertImageEnd = Module.cwrap('convertImageEnd', 'null', ['number']);
   wasm_runPDF = Module.cwrap('runPDF', 'null', ['number', 'number', 'number', 'number', 'number', 'number', 'number']);
-  wasm_pdfSaveDocument = Module.cwrap('pdfSaveDocument', 'null', ['number', 'number', 'number', 'number', 'number', 'number', 'number']);
+  wasm_pdfSaveDocument = Module.cwrap('pdfSaveDocument', 'null', ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'number']);
   mupdf.getLastDrawData = Module.cwrap('getLastDrawData', 'number', []);
   mupdf.getLastDrawSize = Module.cwrap('getLastDrawSize', 'number', []);
   wasm_extractAllFonts = Module.cwrap('extractAllFonts', 'number', ['number']);
@@ -151,12 +153,13 @@ Module.onRuntimeInitialized = function () {
  * @param {number} [args.pageheight=-1] - Height of the pages in the output PDF. Default is -1 (same as input).
  * @param {Boolean} [args.humanReadable=false]
  * @param {Boolean} [args.skipTextInvis=false]
+ * @param {Boolean} [args.delGarbage=true]
  * @returns
  */
 mupdf.save = function (doc, {
-  doc1, minpage = 0, maxpage = -1, pagewidth = -1, pageheight = -1, humanReadable = false, skipTextInvis = false,
+  doc1, minpage = 0, maxpage = -1, pagewidth = -1, pageheight = -1, humanReadable = false, skipTextInvis = false, delGarbage = true,
 }) {
-  wasm_pdfSaveDocument(doc1, minpage, maxpage, pagewidth, pageheight, humanReadable, skipTextInvis);
+  wasm_pdfSaveDocument(doc1, minpage, maxpage, pagewidth, pageheight, humanReadable, skipTextInvis, delGarbage);
   const content = FS.readFile('/download.pdf');
 
   FS.unlink('/download.pdf');
