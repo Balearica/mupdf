@@ -718,6 +718,7 @@ typedef struct
 	int do_preserve_metadata; /* When cleaning, preserve metadata unchanged. */
 	int do_use_objstms; /* Use objstms if possible */
 	int compression_effort; /* 0 for default. 100 = max, 1 = min. */
+	int do_skip_text_invis; /* Skip invisible text when cleaning. */
 } pdf_write_options;
 
 FZ_DATA extern const pdf_write_options pdf_default_write_options;
@@ -734,6 +735,9 @@ FZ_DATA extern const pdf_write_options pdf_default_write_options;
 		s: sanitize content streams
 */
 pdf_write_options *pdf_parse_write_options(fz_context *ctx, pdf_write_options *opts, const char *args);
+
+
+void pdf_overlay_documents(fz_context *ctx, pdf_document *doc_base, pdf_document *doc_text);
 
 /*
 	Returns true if there are digital signatures waiting to

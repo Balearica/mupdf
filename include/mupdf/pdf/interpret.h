@@ -314,6 +314,7 @@ struct pdf_filter_options
 	int instance_forms;
 	int ascii;
 	int no_update;
+	int skip_text_invis;
 
 	void *opaque;
 	void (*complete)(fz_context *ctx, fz_buffer *buffer, void *opaque);
