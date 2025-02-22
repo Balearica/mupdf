@@ -536,6 +536,9 @@ watch:
 watch-recompile:
 	@ while ! inotifywait -q -e modify $(WATCH_SRCS) ; do time -p $(MAKE) ; done
 
+wasm2:
+	$(MAKE) -C platform/wasm2
+
 java:
 	$(MAKE) -C platform/java build=$(build)
 

@@ -513,10 +513,10 @@ void pdf_clean_file(fz_context *ctx, char *infile, char *outfile, char *password
 			pdf_rearrange_pages(ctx, pdf, len, pages);
 		}
 
-		pdf_rewrite_images(ctx, pdf, &opts->image);
+		// pdf_rewrite_images(ctx, pdf, &opts->image);
 
-		if (opts->subset_fonts)
-			pdf_subset_fonts(ctx, pdf, len, pages);
+		// if (opts->subset_fonts)
+		// 	pdf_subset_fonts(ctx, pdf, len, pages);
 
 		pdf_save_document(ctx, pdf, outfile, &opts->write);
 	}

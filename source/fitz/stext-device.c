@@ -83,7 +83,7 @@ void fz_add_layout_char(fz_context *ctx, fz_layout_block *block, float x, float 
 
 #define PARAGRAPH_DIST 1.5f
 #define SPACE_DIST 0.15f
-#define SPACE_MAX_DIST 0.8f
+#define SPACE_MAX_DIST 3.0f
 #define BASE_MAX_DIST 0.8f
 
 /* We keep a stack of the different metatexts that apply at any
@@ -118,6 +118,7 @@ typedef struct
 	fz_matrix trm;
 	int new_obj;
 	int lastchar;
+	float lastsize;
 	int lastbidi;
 	int flags;
 	int color;
@@ -467,8 +468,9 @@ static int may_add_space(int lastchar)
 	 * general punctuation,
 	 * superscripts and subscripts,
 	 * and currency symbols.
+	 * Additionally additions: geometric shapes.
 	 */
-	return (lastchar != ' ' && (lastchar < 0x700 || (lastchar >= 0x2000 && lastchar <= 0x20CF)));
+	return (lastchar != ' ' && (lastchar < 0x700 || (lastchar >= 0x2000 && lastchar <= 0x20CF) || (lastchar >= 0x25A0 && lastchar <= 0x25CF)));
 }
 
 static void
@@ -548,6 +550,7 @@ fz_add_stext_char_imp(fz_context *ctx, fz_stext_device *dev, fz_font *font, int 
 		add_char_to_line(ctx, page, cur_line, trm, font, size, c, (dev->flags & FZ_STEXT_ACCURATE_BBOXES) ? glyph : NON_ACCURATE_GLYPH, &dev->pen, &dev->pen, bidi, dev->color, 0);
 		dev->lastbidi = bidi;
 		dev->lastchar = c;
+		dev->lastsize = size;
 		return;
 	}
 
@@ -578,7 +581,7 @@ fz_add_stext_char_imp(fz_context *ctx, fz_stext_device *dev, fz_font *font, int 
 		base_offset = (-ndir.y * delta.x + ndir.x * delta.y) / size;
 
 		/* Only a small amount off the baseline - we'll take this */
-		if (fabsf(base_offset) < BASE_MAX_DIST)
+		if (fabsf(base_offset) < BASE_MAX_DIST / 2 || size != dev->lastsize && fabsf(base_offset) < BASE_MAX_DIST)
 		{
 			/* If mixed LTR and RTL content */
 			if ((bidi & 1) != (dev->lastbidi & 1))
@@ -645,7 +648,7 @@ fz_add_stext_char_imp(fz_context *ctx, fz_stext_device *dev, fz_font *font, int 
 			/* LTR or neutral character */
 			else
 			{
-				if (fabsf(spacing) < SPACE_DIST)
+				if (spacing > -0.5 && spacing < SPACE_DIST)
 				{
 					/* Motion is in line and small enough to ignore. */
 					new_line = 0;
@@ -656,10 +659,10 @@ fz_add_stext_char_imp(fz_context *ctx, fz_stext_device *dev, fz_font *font, int 
 					 * chars here. Live with it. */
 					new_line = 0;
 				}
-				else if (spacing > 0 && spacing < SPACE_MAX_DIST)
+				else if ((spacing > 0 || dev->lastchar == ' ' && spacing > -1) && spacing < SPACE_MAX_DIST)
 				{
 					/* Motion is forward in line and large enough to warrant us adding a space. */
-					if (wmode == 0 && may_add_space(dev->lastchar))
+					if (spacing > 0.5 || wmode == 0 && may_add_space(dev->lastchar))
 						add_space = 1;
 					new_line = 0;
 				}
@@ -715,6 +718,7 @@ fz_add_stext_char_imp(fz_context *ctx, fz_stext_device *dev, fz_font *font, int 
 
 	add_char_to_line(ctx, page, cur_line, trm, font, size, c, (dev->flags & FZ_STEXT_ACCURATE_BBOXES) ? glyph : NON_ACCURATE_GLYPH, &p, &q, bidi, dev->color, 0);
 	dev->lastchar = c;
+	dev->lastsize = size;
 	dev->lastbidi = bidi;
 	dev->lag_pen = p;
 	dev->pen = q;

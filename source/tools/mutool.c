@@ -50,7 +50,7 @@ int pdfsign_main(int argc, char *argv[]);
 int pdfrecolor_main(int argc, char *argv[]);
 int pdftrim_main(int argc, char *argv[]);
 int pdfbake_main(int argc, char *argv[]);
-
+int pdfoverlay_main(int argc, char *argv[]);
 int cmapdump_main(int argc, char *argv[]);
 int pdfaudit_main(int argc, char *argv[]);
 
@@ -78,6 +78,7 @@ static struct {
 	{ pdfsign_main, "sign", "manipulate PDF digital signatures" },
 	{ pdftrim_main, "trim", "trim PDF page contents" },
 	{ pdfbake_main, "bake", "bake PDF form into static content" },
+	{ pdfoverlay_main, "overlay", "overlay content from text-only pdf document over image-only pdf" },
 #endif
 #if FZ_ENABLE_JS
 	{ murun_main, "run", "run javascript" },

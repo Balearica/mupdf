@@ -3100,7 +3100,7 @@ static void complete_signatures(fz_context *ctx, pdf_document *doc, pdf_write_st
 	}
 }
 
-static void clean_content_streams(fz_context *ctx, pdf_document *doc, int sanitize, int ascii, int newlines)
+static void clean_content_streams(fz_context *ctx, pdf_document *doc, int sanitize, int ascii, int newlines, int skipinvis)
 {
 	int n = pdf_count_pages(ctx, doc);
 	int i;
@@ -3112,7 +3112,8 @@ static void clean_content_streams(fz_context *ctx, pdf_document *doc, int saniti
 	options.recurse = 1;
 	options.ascii = ascii;
 	options.newlines = newlines;
-	options.filters = sanitize ? list : NULL;
+	options.skip_text_invis = skipinvis;
+	options.filters = sanitize || skipinvis ? list : NULL;
 	list[0].filter = pdf_new_sanitize_filter;
 	list[0].options = &sopts;
 
@@ -3296,6 +3297,8 @@ pdf_parse_write_options(fz_context *ctx, pdf_write_options *opts, const char *ar
 		opts->do_clean = fz_option_eq(val, "yes");
 	if (fz_has_option(ctx, args, "sanitize", &val))
 		opts->do_sanitize = fz_option_eq(val, "yes");
+	if (fz_has_option(ctx, args, "skip-text-invis", &val))
+		opts->do_skip_text_invis = fz_option_eq(val, "yes");
 	if (fz_has_option(ctx, args, "incremental", &val))
 		opts->do_incremental = fz_option_eq(val, "yes");
 	if (fz_has_option(ctx, args, "objstms", &val))
@@ -3363,12 +3366,12 @@ static void
 prepare_for_save(fz_context *ctx, pdf_document *doc, const pdf_write_options *in_opts)
 {
 	/* Rewrite (and possibly sanitize) the operator streams */
-	if (in_opts->do_clean || in_opts->do_sanitize)
+	if (in_opts->do_clean || in_opts->do_sanitize || in_opts->do_skip_text_invis)
 	{
 		pdf_begin_operation(ctx, doc, "Clean content streams");
 		fz_try(ctx)
 		{
-			clean_content_streams(ctx, doc, in_opts->do_sanitize, in_opts->do_ascii, in_opts->do_pretty);
+			clean_content_streams(ctx, doc, in_opts->do_sanitize, in_opts->do_ascii, in_opts->do_pretty, in_opts->do_skip_text_invis);
 			pdf_end_operation(ctx, doc);
 		}
 		fz_catch(ctx)

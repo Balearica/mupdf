@@ -1159,6 +1159,7 @@ static pdf_obj *rect_subtypes[] = {
 	PDF_NAME(Sound),
 	PDF_NAME(Movie),
 	PDF_NAME(Widget),
+	PDF_NAME(Highlight),
 	NULL,
 };
 
@@ -4295,4 +4296,63 @@ void
 pdf_set_annot_hidden_for_editing(fz_context *ctx, pdf_annot *annot, int hidden)
 {
 	annot->hidden_editing = hidden;
+}
+
+void pdf_highlight_page(pdf_document *doc, fz_context *ctx, int number, int x0, int y0, int x1, int y1)
+{
+	static const float yellow_orange[3] = { 1.0f, 0.784f, 0.0f };
+
+	pdf_page *page = NULL;
+	fz_stext_page *page_text = NULL;
+
+	static fz_quad hits[1000];
+
+	int i, n;
+
+	int flags = PDF_ANNOT_IS_PRINT; /* Make printable as default */
+
+	pdf_annot *annot = NULL;
+
+	fz_point point_a = { x0, y0 };
+	fz_point point_b = { x1, y1 };
+
+	fz_rect rect = fz_empty_rect;
+
+	rect.x0 = x0;
+	rect.y0 = y0;
+	rect.x1 = x1;
+	rect.y1 = y1;
+
+	fz_var(annot);
+
+	fz_try(ctx)
+	{
+		page = fz_load_page(ctx, doc, number);
+		page_text = fz_new_stext_page_from_page(ctx, page, NULL);
+
+		n = fz_highlight_selection(ctx, page_text, point_a, point_b, hits, nelem(hits));
+
+		annot = pdf_create_annot_raw(ctx, page, PDF_ANNOT_HIGHLIGHT);
+
+		pdf_set_annot_color(ctx, annot, 3, yellow_orange);
+		pdf_set_annot_opacity(ctx, annot, 0.2f);
+		pdf_set_annot_rect(ctx, annot, rect);
+
+		pdf_dict_put(ctx, annot->obj, PDF_NAME(P), page->obj);
+		pdf_dict_put_int(ctx, annot->obj, PDF_NAME(F), flags);
+
+
+		for (i = 0; i < n; ++i)
+		{
+			pdf_add_annot_quad_point(ctx, annot, hits[i]);
+		}
+
+	}
+	fz_catch(ctx)
+	{
+		pdf_drop_annot(ctx, annot);
+		fz_rethrow(ctx);
+	}
+
+	return;
 }
